@@ -3,42 +3,25 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus,
-  ChevronDown,
-  ChevronRight,
   Dumbbell,
-  Timer,
-  Check,
-  Loader2,
   Play,
-  Pause,
-  RotateCcw,
   Clock,
   ClipboardList,
-  Trophy,
   TriangleAlert,
   Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-  CardAction,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { ExerciseSelector } from "@/components/ExerciseSelector";
-import { ExerciseSubstitute } from "@/components/ExerciseSubstitute";
-import { AiCoachDialog } from "@/components/AiCoachDialog";
+  ExerciseSelector,
+  Paywall,
+} from "@/components/dynamic-imports";
+import { WorkoutLoadingSkeleton } from "@/components/loading/page-skeletons";
+import { RestTimer } from "@/components/workout/RestTimer";
+import { ExerciseCard } from "@/components/workout/ExerciseCard";
+import { FinishDialog } from "@/components/workout/FinishDialog";
+import type { ExerciseGroup, SetRecord } from "@/components/workout/types";
 import { createClient } from "@/lib/supabase/client";
 import type { Exercise } from "@/lib/exercise-substitution";
 import {
@@ -52,7 +35,6 @@ import {
   getReadinessLevel,
 } from "@/lib/recovery-engine";
 import { isPro as checkIsPro } from "@/lib/subscription";
-import { Paywall } from "@/components/Paywall";
 import { workoutSetSchema } from "@/lib/validations";
 import { toast } from "sonner";
 
@@ -64,24 +46,6 @@ interface WorkoutSession {
   completed_at: string | null;
   notes: string | null;
   status: string;
-}
-
-interface SetRecord {
-  id: string;
-  session_id: string;
-  exercise_id: string;
-  set_number: number;
-  weight: number | null;
-  reps: number | null;
-  rpe: number | null;
-  completed: boolean;
-  notes: string | null;
-}
-
-interface ExerciseGroup {
-  exercise: Exercise;
-  sets: SetRecord[];
-  collapsed: boolean;
 }
 
 interface PlanDayPreview {
@@ -127,14 +91,6 @@ interface RecoverySnapshot {
   doms: number;
   stress: number;
   readiness: number;
-}
-
-const REST_PRESETS = [60, 90, 120, 180];
-
-function formatTimer(seconds: number) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function formatWeight(weight: number | null): string {
@@ -183,6 +139,7 @@ export default function WorkoutPage() {
   const [todayRecovery, setTodayRecovery] = useState<RecoverySnapshot | null>(null);
   const [userIsPro, setUserIsPro] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [expressMode, setExpressMode] = useState(false);
 
   /* ───────────── Init ───────────── */
 
@@ -198,39 +155,43 @@ export default function WorkoutPage() {
       }
       setUserId(user.id);
 
-      const proStatus = await checkIsPro(supabase, user.id);
+      const [proStatus, recoveryRes, exercisesRes, activeRes] =
+        await Promise.all([
+          checkIsPro(supabase, user.id),
+          supabase
+            .from("recovery_logs")
+            .select("sleep, doms, stress, readiness")
+            .eq("user_id", user.id)
+            .eq("date", getLocalDateKey())
+            .maybeSingle(),
+          supabase.from("exercises").select("*").order("name"),
+          supabase
+            .from("workout_sessions")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("status", "in_progress")
+            .order("started_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+        ]);
+
       if (!cancelled) setUserIsPro(proStatus);
-
-      const { data: recovery } = await supabase
-        .from("recovery_logs")
-        .select("sleep, doms, stress, readiness")
-        .eq("user_id", user.id)
-        .eq("date", getLocalDateKey())
-        .maybeSingle();
       if (!cancelled) {
-        setTodayRecovery((recovery as RecoverySnapshot | null) ?? null);
+        setTodayRecovery(
+          (recoveryRes.data as RecoverySnapshot | null) ?? null,
+        );
       }
-
-      const { data: exercises } = await supabase
-        .from("exercises")
-        .select("*")
-        .order("name");
-      const exList = (exercises ?? []) as Exercise[];
+      const exList = (exercisesRes.data ?? []) as Exercise[];
       if (!cancelled) setAllExercises(exList);
 
-      const { data: active } = await supabase
-        .from("workout_sessions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("status", "in_progress")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const active = activeRes.data;
 
       if (active && !cancelled) {
         setSession(active);
-        await restoreSession(active.id, exList);
-        await loadSessionPlanItems(active.plan_day_id);
+        await Promise.all([
+          restoreSession(active.id, exList),
+          loadSessionPlanItems(active.plan_day_id),
+        ]);
       }
 
       if (!active && !cancelled) {
@@ -270,24 +231,28 @@ export default function WorkoutPage() {
     }
 
     async function loadPlanDay(uid: string) {
-      const { data: planData } = await supabase
-        .from("plans")
-        .select(
-          "id, plan_days(id, day_number, name, focus, plan_items(exercise_id, order_index, sets, rep_range_min, rep_range_max, target_rpe, notes))",
-        )
-        .eq("user_id", uid)
-        .eq("is_active", true)
-        .maybeSingle();
+      const [planRes, countRes] = await Promise.all([
+        supabase
+          .from("plans")
+          .select(
+            "id, plan_days(id, day_number, name, focus, plan_items(exercise_id, order_index, sets, rep_range_min, rep_range_max, target_rpe, notes))",
+          )
+          .eq("user_id", uid)
+          .eq("is_active", true)
+          .maybeSingle(),
+        supabase
+          .from("workout_sessions")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", uid)
+          .eq("status", "completed")
+          .not("plan_day_id", "is", null),
+      ]);
+
+      const planData = planRes.data;
+      const { count } = countRes;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (!planData || !(planData as any).plan_days?.length) return;
-
-      const { count } = await supabase
-        .from("workout_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", uid)
-        .eq("status", "completed")
-        .not("plan_day_id", "is", null);
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sortedDays = [...(planData as any).plan_days].sort(
@@ -488,10 +453,15 @@ export default function WorkoutPage() {
     const readinessInfo = todayRecovery
       ? getReadinessLevel(todayRecovery.readiness)
       : null;
-    const itemsForToday =
+    let itemsForToday =
       readinessInfo && userIsPro
         ? adjustWorkoutForReadiness(nextPlanDay.items, readinessInfo.level)
         : nextPlanDay.items;
+
+    if (expressMode) {
+      const expressCount = Math.min(3, Math.ceil(itemsForToday.length / 2));
+      itemsForToday = itemsForToday.slice(0, expressCount);
+    }
 
     const { data: newSession } = await supabase
       .from("workout_sessions")
@@ -792,11 +762,7 @@ export default function WorkoutPage() {
   /* ───────────── Render ───────────── */
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <WorkoutLoadingSkeleton />;
   }
 
   if (!session) {
@@ -881,13 +847,41 @@ export default function WorkoutPage() {
                     </Badge>
                   )}
                 </div>
+
+                {nextPlanDay.items.length > 3 && (
+                  <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setExpressMode(false)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-center text-xs font-medium transition-colors ${
+                        !expressMode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Full ({nextPlanDay.items.length} exercises)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExpressMode(true)}
+                      className={`flex-1 rounded-md px-3 py-1.5 text-center text-xs font-medium transition-colors ${
+                        expressMode
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      Express ({Math.min(3, Math.ceil(nextPlanDay.items.length / 2))})
+                    </button>
+                  </div>
+                )}
+
                 <Button
                   onClick={startPlannedWorkout}
                   size="lg"
                   className="w-full"
                 >
                   <Play className="size-4" />
-                  Start Planned Workout
+                  {expressMode ? "Start Express Workout" : "Start Planned Workout"}
                 </Button>
               </div>
             )}
@@ -918,191 +912,21 @@ export default function WorkoutPage() {
 
       {/* Exercise groups */}
       {groups.map((g, gi) => (
-        <Card key={`${g.exercise.id}-${gi}`}>
-          <CardHeader>
-            <CardTitle
-              className="flex cursor-pointer items-center gap-2 select-none"
-              onClick={() => toggleCollapse(gi)}
-            >
-              {g.collapsed ? (
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              ) : (
-                <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-              )}
-              <span className="truncate">{g.exercise.name}</span>
-              <Badge
-                variant="outline"
-                className="ml-1 shrink-0 capitalize text-[11px]"
-              >
-                {g.exercise.primary_muscle}
-              </Badge>
-            </CardTitle>
-            <CardAction className="flex items-center gap-1">
-              <AiCoachDialog
-                context="workout"
-                contextData={{
-                  exercise: {
-                    name: g.exercise.name,
-                    primary_muscle: g.exercise.primary_muscle,
-                    secondary_muscles: g.exercise.secondary_muscles,
-                    equipment: g.exercise.equipment,
-                    movement_pattern: g.exercise.movement_pattern,
-                    difficulty: g.exercise.difficulty,
-                    description: g.exercise.description,
-                    tips: g.exercise.tips,
-                  },
-                  recentSets: g.sets
-                    .filter((s) => s.completed)
-                    .map((s) => ({
-                      weight: s.weight,
-                      reps: s.reps,
-                      rpe: s.rpe,
-                      set_number: s.set_number,
-                    })),
-                  planItem: planItemsByExercise[g.exercise.id]
-                    ? {
-                        sets: g.sets.length,
-                        rep_range_min: planItemsByExercise[g.exercise.id].rep_range_min ?? 8,
-                        rep_range_max: planItemsByExercise[g.exercise.id].rep_range_max ?? 12,
-                        target_rpe: planItemsByExercise[g.exercise.id].target_rpe ?? 8,
-                      }
-                    : null,
-                }}
-                isPro={userIsPro}
-                trigger={
-                  <Button variant="ghost" size="icon-sm">
-                    <Sparkles className="size-4" />
-                  </Button>
-                }
-              />
-              <ExerciseSubstitute
-                exercise={g.exercise}
-                allExercises={allExercises}
-                onSwap={(ex) => handleSwap(gi, ex)}
-              />
-            </CardAction>
-          </CardHeader>
-
-          {!g.collapsed && (
-            <CardContent className="space-y-2">
-              {lastRecordsByExercise[g.exercise.id] && (
-                <p className="text-xs text-muted-foreground">
-                  Last: {formatWeight(lastRecordsByExercise[g.exercise.id]!.weight)} x{" "}
-                  {lastRecordsByExercise[g.exercise.id]!.reps.join(",")}
-                </p>
-              )}
-              <div className="grid grid-cols-[1.5rem_1fr_1fr_1fr_2.5rem] gap-1.5 px-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground sm:grid-cols-[2rem_1fr_1fr_1fr_2.5rem] sm:gap-2">
-                <span>Set</span>
-                <span>kg</span>
-                <span>Reps</span>
-                <span>RPE</span>
-                <span className="text-center">✓</span>
-              </div>
-
-              {g.sets.map((set, si) => (
-                <div
-                  key={set.id}
-                  className={`grid grid-cols-[1.5rem_1fr_1fr_1fr_2.5rem] items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors sm:grid-cols-[2rem_1fr_1fr_1fr_2.5rem] sm:gap-2 ${
-                    set.completed ? "bg-primary/5" : ""
-                  }`}
-                >
-                  <span className="text-center text-sm font-medium text-muted-foreground">
-                    {set.set_number}
-                  </span>
-                  <Input
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="any"
-                    value={set.weight ?? ""}
-                    placeholder="0"
-                    className="h-9 text-sm sm:h-8"
-                    onChange={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseFloat(e.target.value);
-                      updateLocal(gi, si, "weight", v);
-                    }}
-                    onBlur={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseFloat(e.target.value);
-                      saveField(set.id, { weight: v });
-                    }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min={0}
-                    value={set.reps ?? ""}
-                    placeholder="0"
-                    className="h-9 text-sm sm:h-8"
-                    onChange={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseInt(e.target.value, 10);
-                      updateLocal(gi, si, "reps", v);
-                    }}
-                    onBlur={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseInt(e.target.value, 10);
-                      saveField(set.id, { reps: v });
-                    }}
-                  />
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={10}
-                    value={set.rpe ?? ""}
-                    placeholder="—"
-                    className="h-9 text-sm sm:h-8"
-                    onChange={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseInt(e.target.value, 10);
-                      updateLocal(gi, si, "rpe", v);
-                    }}
-                    onBlur={(e) => {
-                      const v =
-                        e.target.value === ""
-                          ? null
-                          : parseInt(e.target.value, 10);
-                      saveField(set.id, { rpe: v });
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => toggleComplete(gi, si)}
-                    className={`mx-auto flex size-7 items-center justify-center rounded-md border transition-colors ${
-                      set.completed
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input hover:bg-accent"
-                    }`}
-                  >
-                    {set.completed && <Check className="size-4" />}
-                  </button>
-                </div>
-              ))}
-
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                onClick={() => handleAddSet(gi)}
-              >
-                <Plus className="size-3" />
-                Add Set
-              </Button>
-            </CardContent>
-          )}
-        </Card>
+        <ExerciseCard
+          key={`${g.exercise.id}-${gi}`}
+          group={g}
+          groupIndex={gi}
+          lastRecord={lastRecordsByExercise[g.exercise.id] ?? null}
+          planItem={planItemsByExercise[g.exercise.id]}
+          onToggleCollapse={toggleCollapse}
+          onUpdateLocal={updateLocal}
+          onSaveField={saveField}
+          onToggleComplete={toggleComplete}
+          onAddSet={handleAddSet}
+          onSwap={handleSwap}
+          allExercises={allExercises}
+          userIsPro={userIsPro}
+        />
       ))}
 
       {/* Add Exercise */}
@@ -1128,152 +952,48 @@ export default function WorkoutPage() {
         </Button>
       )}
 
-      {/* ── Rest Timer (sticky bottom) ── */}
-      <div
-        className={`fixed inset-x-0 bottom-0 z-40 border-t px-3 py-2.5 transition-colors sm:px-4 sm:py-3 ${
-          restDone
-            ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/40"
-            : "border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-        }`}
-      >
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2">
-            <Timer
-              className={`size-5 shrink-0 ${restDone ? "text-green-600" : "text-muted-foreground"}`}
-            />
-            <span
-              className={`font-mono text-2xl font-bold tabular-nums sm:text-3xl ${
-                restDone
-                  ? "text-green-600"
-                  : restActive
-                    ? "text-foreground"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {formatTimer(restRemaining)}
-            </span>
-            {restDone && (
-              <Badge className="hidden animate-pulse bg-green-600 text-white sm:inline-flex">
-                Rest Complete!
-              </Badge>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 sm:gap-2">
-            <div className="flex gap-0.5 sm:gap-1">
-              {REST_PRESETS.map((t) => (
-                <Button
-                  key={t}
-                  variant={restDuration === t ? "secondary" : "ghost"}
-                  size="xs"
-                  className="min-w-0 px-1.5 text-xs sm:px-2"
-                  onClick={() => {
-                    setRestDuration(t);
-                    if (!restActive) setRestRemaining(t);
-                  }}
-                >
-                  {t >= 60 ? `${t / 60}m` : `${t}s`}
-                </Button>
-              ))}
-            </div>
-
-            {restActive ? (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => setRestActive(false)}
-              >
-                <Pause className="size-4" />
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() => {
-                  if (restRemaining === 0) setRestRemaining(restDuration);
-                  setRestActive(true);
-                  setRestDone(false);
-                }}
-              >
-                <Play className="size-4" />
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => {
-                setRestActive(false);
-                setRestRemaining(restDuration);
-                setRestDone(false);
-              }}
-            >
-              <RotateCcw className="size-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Finish Dialog ── */}
-      <Dialog open={showFinish} onOpenChange={setShowFinish}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Finish Workout?</DialogTitle>
-            <DialogDescription>
-              You completed {completedSets} set
-              {completedSets !== 1 ? "s" : ""} across {groups.length} exercise
-              {groups.length !== 1 ? "s" : ""}.
-            </DialogDescription>
-          </DialogHeader>
-          <textarea
-            className="min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 outline-none"
-            placeholder="Add notes about this workout (optional)..."
-            value={finishNotes}
-            onChange={(e) => setFinishNotes(e.target.value)}
-          />
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Next Time Recommendations</p>
-            {loadingFinishInsights ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Preparing progression insights...
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {finishInsights.map((insight) => (
-                  <div
-                    key={insight.exerciseId}
-                    className="rounded-md border bg-muted/20 p-3"
-                  >
-                    <p className="text-sm font-medium">{insight.recommendationText}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{insight.reason}</p>
-                    {insight.prText && (
-                      <p className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-green-600">
-                        <Trophy className="size-3.5" />
-                        {insight.prText}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowFinish(false)}>
-              Cancel
-            </Button>
-            <Button onClick={finishWorkout} disabled={finishing}>
-              {finishing && <Loader2 className="size-4 animate-spin" />}
-              Complete Workout
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Paywall
-        open={showPaywall}
-        onOpenChange={setShowPaywall}
-        feature="recovery_adjustment"
+      <RestTimer
+        restDuration={restDuration}
+        restRemaining={restRemaining}
+        restActive={restActive}
+        restDone={restDone}
+        onPresetSelect={(t) => {
+          setRestDuration(t);
+          if (!restActive) setRestRemaining(t);
+        }}
+        onStart={() => {
+          if (restRemaining === 0) setRestRemaining(restDuration);
+          setRestActive(true);
+          setRestDone(false);
+        }}
+        onPause={() => setRestActive(false)}
+        onReset={() => {
+          setRestActive(false);
+          setRestRemaining(restDuration);
+          setRestDone(false);
+        }}
       />
+
+      <FinishDialog
+        open={showFinish}
+        onOpenChange={setShowFinish}
+        completedSets={completedSets}
+        groupsLength={groups.length}
+        finishNotes={finishNotes}
+        onNotesChange={setFinishNotes}
+        finishInsights={finishInsights}
+        loadingFinishInsights={loadingFinishInsights}
+        onFinish={finishWorkout}
+        finishing={finishing}
+      />
+
+      {showPaywall && (
+        <Paywall
+          open={showPaywall}
+          onOpenChange={setShowPaywall}
+          feature="recovery_adjustment"
+        />
+      )}
     </div>
   );
 }

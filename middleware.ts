@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const publicPaths = ["/", "/login", "/register", "/privacy"];
+const publicPaths = ["/", "/login", "/register", "/privacy", "/exercises"];
 
 const profileRequiredPaths = [
   "/dashboard",
@@ -11,6 +11,7 @@ const profileRequiredPaths = [
   "/progress",
   "/history",
   "/settings",
+  "/report",
 ];
 
 export async function middleware(request: NextRequest) {

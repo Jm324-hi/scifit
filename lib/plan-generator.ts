@@ -72,12 +72,14 @@ const COMPOUND_REPS: Record<string, [number, number]> = {
   strength: [4, 6],
   muscle: [6, 10],
   fat_loss: [8, 12],
+  general: [6, 12],
 };
 
 const ISOLATION_REPS: Record<string, [number, number]> = {
   strength: [8, 12],
   muscle: [8, 15],
   fat_loss: [12, 20],
+  general: [10, 15],
 };
 
 /* ─── Slot templates ────────────────────────────────── */

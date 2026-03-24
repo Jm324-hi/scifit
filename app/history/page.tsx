@@ -9,7 +9,6 @@ import {
   Clock,
   Dumbbell,
   Layers,
-  Loader2,
   CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -23,7 +22,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { isPro as checkIsPro } from "@/lib/subscription";
-import { Paywall } from "@/components/Paywall";
+import { Paywall } from "@/components/dynamic-imports";
+import { HistoryLoadingSkeleton } from "@/components/loading/page-skeletons";
 import { Lock } from "lucide-react";
 
 interface SetData {
@@ -114,20 +114,21 @@ export default function HistoryPage() {
         return;
       }
 
-      const proStatus = await checkIsPro(supabase, user.id);
+      const [proStatus, sessionsRes] = await Promise.all([
+        checkIsPro(supabase, user.id),
+        supabase
+          .from("workout_sessions")
+          .select(
+            "id, started_at, completed_at, notes, workout_sets(id, exercise_id, set_number, weight, reps, rpe, completed, exercises(name, primary_muscle, equipment))"
+          )
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .order("started_at", { ascending: false }),
+      ]);
+
       if (!cancelled) setUserIsPro(proStatus);
-
-      const { data } = await supabase
-        .from("workout_sessions")
-        .select(
-          "id, started_at, completed_at, notes, workout_sets(id, exercise_id, set_number, weight, reps, rpe, completed, exercises(name, primary_muscle, equipment))"
-        )
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .order("started_at", { ascending: false });
-
       if (!cancelled) {
-        setSessions((data as SessionData[] | null) ?? []);
+        setSessions((sessionsRes.data as SessionData[] | null) ?? []);
         setLoading(false);
       }
     }
@@ -148,11 +149,7 @@ export default function HistoryPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <HistoryLoadingSkeleton />;
   }
 
   return (
@@ -295,11 +292,13 @@ export default function HistoryPage() {
           })}
         </div>
 
-        <Paywall
-          open={showPaywall}
-          onOpenChange={setShowPaywall}
-          feature="unlimited_history"
-        />
+        {showPaywall && (
+          <Paywall
+            open={showPaywall}
+            onOpenChange={setShowPaywall}
+            feature="unlimited_history"
+          />
+        )}
         </>
       )}
     </div>

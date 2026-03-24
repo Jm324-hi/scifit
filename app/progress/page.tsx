@@ -79,17 +79,19 @@ export default async function ProgressPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const userIsPro = await checkIsPro(supabase, user.id);
+  const [userIsPro, sessionsRes] = await Promise.all([
+    checkIsPro(supabase, user.id),
+    supabase
+      .from("workout_sessions")
+      .select(
+        "id, started_at, workout_sets(exercise_id, weight, reps, completed, exercises(name, movement_pattern, primary_muscle))",
+      )
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("started_at", { ascending: false }),
+  ]);
 
-  const { data } = await supabase
-    .from("workout_sessions")
-    .select(
-      "id, started_at, workout_sets(exercise_id, weight, reps, completed, exercises(name, movement_pattern, primary_muscle))",
-    )
-    .eq("user_id", user.id)
-    .eq("status", "completed")
-    .order("started_at", { ascending: false });
-
+  const { data } = sessionsRes;
   const sessions = ((data as SessionData[] | null) ?? []).filter(
     (session) => session.workout_sets?.length > 0,
   );

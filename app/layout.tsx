@@ -8,20 +8,24 @@ import { Toaster } from "@/components/ui/sonner";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "SciFit - Science-Based Smart Training",
-    template: "%s | SciFit",
+    default: "Kineroz - Science-Based Smart Training",
+    template: "%s | Kineroz",
   },
   description:
-    "SciFit is your intelligent training assistant — grounded in exercise science, it helps you plan workouts, track progressive overload, and optimize recovery so every effort counts.",
+    "Kineroz is your intelligent training assistant — grounded in exercise science, it helps you plan workouts, track progressive overload, and optimize recovery so every effort counts.",
   keywords: [
     "fitness",
     "workout tracker",
@@ -32,25 +36,31 @@ export const metadata: Metadata = {
     "smart training",
     "gym",
     "strength training",
+    "kineroz",
   ],
-  authors: [{ name: "SciFit" }],
-  creator: "SciFit",
+  authors: [{ name: "Kineroz" }],
+  creator: "Kineroz",
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://scifit.app",
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://kineroz.com",
   ),
   openGraph: {
     type: "website",
-    siteName: "SciFit",
-    title: "SciFit - Science-Based Smart Training",
+    siteName: "Kineroz",
+    title: "Kineroz - Science-Based Smart Training",
     description:
       "Plan workouts, track progressive overload, and optimize recovery with an intelligent training assistant grounded in exercise science.",
     locale: "en_US",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "SciFit - Science-Based Smart Training",
+    title: "Kineroz - Science-Based Smart Training",
     description:
       "Plan workouts, track progressive overload, and optimize recovery with an intelligent training assistant grounded in exercise science.",
+    images: ["/twitter-image"],
+  },
+  icons: {
+    icon: "/icon.svg",
   },
   robots: {
     index: true,

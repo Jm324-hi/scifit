@@ -47,6 +47,12 @@ const goals = [
     description: "Reduce body fat while preserving muscle",
     icon: Flame,
   },
+  {
+    value: "general",
+    label: "General Fitness",
+    description: "Improve overall health, endurance, and well-being",
+    icon: Target,
+  },
 ];
 
 const equipmentOptions = [
@@ -210,7 +216,7 @@ export default function OnboardingPage() {
           <p className="text-center text-muted-foreground">
             What is your primary training goal?
           </p>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             {goals.map((g) => (
               <Card
                 key={g.value}
@@ -333,12 +339,12 @@ export default function OnboardingPage() {
             <Slider
               value={availableTime}
               onValueChange={setAvailableTime}
-              min={30}
+              min={20}
               max={120}
               step={5}
             />
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>30 min</span>
+              <span>20 min</span>
               <span>120 min</span>
             </div>
           </div>

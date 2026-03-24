@@ -6,7 +6,6 @@ import {
   Dumbbell,
   CreditCard,
   Info,
-  Loader2,
   Crown,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,7 +23,8 @@ import {
   getUserSubscription,
   type Subscription,
 } from "@/lib/subscription";
-import { Paywall } from "@/components/Paywall";
+import { Paywall } from "@/components/dynamic-imports";
+import { SettingsLoadingSkeleton } from "@/components/loading/page-skeletons";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -54,11 +54,7 @@ export default function SettingsPage() {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <SettingsLoadingSkeleton />;
   }
 
   const isPro =
@@ -176,7 +172,7 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2 text-sm text-muted-foreground">
-              <p>SciFit v0.1.0</p>
+              <p>Kineroz v0.1.0</p>
               <p>Science-based smart training assistant</p>
             </div>
           </CardContent>
@@ -184,7 +180,9 @@ export default function SettingsPage() {
 
       </div>
 
-      <Paywall open={showPaywall} onOpenChange={setShowPaywall} />
+      {showPaywall && (
+        <Paywall open={showPaywall} onOpenChange={setShowPaywall} />
+      )}
     </div>
   );
 }

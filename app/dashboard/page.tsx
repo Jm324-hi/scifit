@@ -34,6 +34,7 @@ const goalLabels: Record<string, string> = {
   muscle: "Muscle Building",
   strength: "Strength",
   fat_loss: "Fat Loss",
+  general: "General Fitness",
 };
 
 const equipmentLabels: Record<string, string> = {
@@ -102,22 +103,74 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
 
+  const [
+    profileRes,
+    activePlanRes,
+    todaySessionsRes,
+    recentSessionsRes,
+    progressSessionsRes,
+    todayRecoveryLogRes,
+    completedPlannedRes,
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", user.id).single(),
+    supabase
+      .from("plans")
+      .select("id, name, split_type, frequency, goal")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .maybeSingle(),
+    supabase
+      .from("workout_sessions")
+      .select(
+        "id, started_at, completed_at, status, workout_sets(id, exercise_id, completed)",
+      )
+      .eq("user_id", user.id)
+      .gte("started_at", todayISO)
+      .order("started_at", { ascending: false }),
+    supabase
+      .from("workout_sessions")
+      .select(
+        "id, started_at, completed_at, workout_sets(id, exercise_id, completed)",
+      )
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .limit(3),
+    supabase
+      .from("workout_sessions")
+      .select(
+        "id, started_at, workout_sets(exercise_id, weight, reps, completed)",
+      )
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .order("started_at", { ascending: false }),
+    supabase
+      .from("recovery_logs")
+      .select("sleep, doms, stress, readiness")
+      .eq("user_id", user.id)
+      .eq("date", localDateKey())
+      .maybeSingle(),
+    supabase
+      .from("workout_sessions")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .not("plan_day_id", "is", null),
+  ]);
+
+  const { data: profile } = profileRes;
   if (!profile) redirect("/onboarding");
 
-  /* ─── Active plan + next day ─── */
-
-  const { data: activePlan } = await supabase
-    .from("plans")
-    .select("id, name, split_type, frequency, goal")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  const { data: activePlan } = activePlanRes;
+  const { data: todaySessions } = todaySessionsRes;
+  const { data: recentSessions } = recentSessionsRes;
+  const { data: progressSessions } = progressSessionsRes;
+  const { data: todayRecoveryLog } = todayRecoveryLogRes;
+  const { count: completedPlanned } = completedPlannedRes;
 
   let nextDayName = "";
   let nextDayFocus = "";
@@ -131,13 +184,6 @@ export default async function DashboardPage() {
       .order("day_number");
 
     if (planDays && planDays.length > 0) {
-      const { count: completedPlanned } = await supabase
-        .from("workout_sessions")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .not("plan_day_id", "is", null);
-
       const dayIndex = (completedPlanned ?? 0) % planDays.length;
       const nextDay = planDays[dayIndex];
       nextDayName = nextDay.name;
@@ -174,21 +220,6 @@ export default async function DashboardPage() {
     }
   }
 
-  /* ─── Today's sessions ─── */
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayISO = today.toISOString();
-
-  const { data: todaySessions } = await supabase
-    .from("workout_sessions")
-    .select(
-      "id, started_at, completed_at, status, workout_sets(id, exercise_id, completed)"
-    )
-    .eq("user_id", user.id)
-    .gte("started_at", todayISO)
-    .order("started_at", { ascending: false });
-
   const inProgress = todaySessions?.find((s) => s.status === "in_progress");
   const completedToday = todaySessions?.find(
     (s) => s.status === "completed"
@@ -207,16 +238,6 @@ export default async function DashboardPage() {
     todaySetCount = completedSets.length;
   }
 
-  const { data: recentSessions } = await supabase
-    .from("workout_sessions")
-    .select(
-      "id, started_at, completed_at, workout_sets(id, exercise_id, completed)"
-    )
-    .eq("user_id", user.id)
-    .eq("status", "completed")
-    .order("started_at", { ascending: false })
-    .limit(3);
-
   const recentWorkouts = (recentSessions ?? []).map((s) => {
     const sets = s.workout_sets ?? [];
     const done = sets.filter(
@@ -234,13 +255,6 @@ export default async function DashboardPage() {
       setCount: done.length,
     };
   });
-
-  const { data: progressSessions } = await supabase
-    .from("workout_sessions")
-    .select("id, started_at, workout_sets(exercise_id, weight, reps, completed)")
-    .eq("user_id", user.id)
-    .eq("status", "completed")
-    .order("started_at", { ascending: false });
 
   const completedSessions = progressSessions ?? [];
   const exerciseWithData = new Set<string>();
@@ -269,13 +283,6 @@ export default async function DashboardPage() {
     consecutiveTrainingWeeks += 1;
     cursor.setDate(cursor.getDate() - 7);
   }
-
-  const { data: todayRecoveryLog } = await supabase
-    .from("recovery_logs")
-    .select("sleep, doms, stress, readiness")
-    .eq("user_id", user.id)
-    .eq("date", localDateKey())
-    .maybeSingle();
 
   const readinessInfo = todayRecoveryLog
     ? getReadinessLevel(todayRecoveryLog.readiness)

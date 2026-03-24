@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const profileSchema = z.object({
-  goal: z.enum(["muscle", "strength", "fat_loss"], {
+  goal: z.enum(["muscle", "strength", "fat_loss", "general"], {
     message: "Please select a training goal.",
   }),
   frequency: z.number().int().min(2, "Minimum 2 days per week.").max(6, "Maximum 6 days per week."),
@@ -14,7 +14,7 @@ export const profileSchema = z.object({
   available_time: z
     .number()
     .int()
-    .min(30, "Minimum 30 minutes per session.")
+    .min(20, "Minimum 20 minutes per session.")
     .max(120, "Maximum 120 minutes per session."),
 });
 

@@ -16,14 +16,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { RecoveryLoadingSkeleton } from "@/components/loading/page-skeletons";
 import {
   adjustWorkoutForReadiness,
   calculateReadiness,
   getReadinessLevel,
 } from "@/lib/recovery-engine";
 import { isPro as checkIsPro } from "@/lib/subscription";
-import { Paywall } from "@/components/Paywall";
-import { AiCoachDialog } from "@/components/AiCoachDialog";
+import { Paywall, AiCoachDialog } from "@/components/dynamic-imports";
 import { recoveryLogSchema } from "@/lib/validations";
 
 interface PlanPreviewItem {
@@ -171,17 +171,64 @@ export default function RecoveryPage() {
       }
       setUserId(user.id);
 
-      const proStatus = await checkIsPro(supabase, user.id);
-      if (!cancelled) setUserIsPro(proStatus);
-
       const todayKey = getLocalDateKey();
-      const { data: todayLog } = await supabase
-        .from("recovery_logs")
-        .select("sleep, doms, stress, readiness, notes")
-        .eq("user_id", user.id)
-        .eq("date", todayKey)
-        .maybeSingle<RecoveryLog>();
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const yesterdayStart = new Date(todayStart);
+      yesterdayStart.setDate(todayStart.getDate() - 1);
 
+      const [
+        proStatus,
+        todayLogRes,
+        yesterdaySessionsRes,
+        activePlanRes,
+        lastSessionRes,
+        completedPlannedRes,
+      ] = await Promise.all([
+        checkIsPro(supabase, user.id),
+        supabase
+          .from("recovery_logs")
+          .select("sleep, doms, stress, readiness, notes")
+          .eq("user_id", user.id)
+          .eq("date", todayKey)
+          .maybeSingle<RecoveryLog>(),
+        supabase
+          .from("workout_sessions")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .gte("started_at", yesterdayStart.toISOString())
+          .lt("started_at", todayStart.toISOString())
+          .limit(1),
+        supabase
+          .from("plans")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .maybeSingle(),
+        supabase
+          .from("workout_sessions")
+          .select("id, started_at")
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("workout_sessions")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .not("plan_day_id", "is", null),
+      ]);
+
+      const todayLog = todayLogRes.data;
+      const yesterdaySessions = yesterdaySessionsRes.data ?? [];
+      const activePlan = activePlanRes.data;
+      const lastSession = lastSessionRes.data;
+      const { count: completedPlanned } = completedPlannedRes;
+
+      if (!cancelled) setUserIsPro(proStatus);
       if (todayLog && !cancelled) {
         setSleep(todayLog.sleep);
         setDoms([todayLog.doms]);
@@ -189,31 +236,9 @@ export default function RecoveryPage() {
         setExistingNotes(todayLog.notes);
         setHasSavedToday(true);
       }
+      if (!cancelled) setHadWorkoutYesterday(yesterdaySessions.length > 0);
 
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const yesterdayStart = new Date(todayStart);
-      yesterdayStart.setDate(todayStart.getDate() - 1);
-
-      const { data: yesterdaySessions } = await supabase
-        .from("workout_sessions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .gte("started_at", yesterdayStart.toISOString())
-        .lt("started_at", todayStart.toISOString())
-        .limit(1);
-
-      if (!cancelled) setHadWorkoutYesterday((yesterdaySessions ?? []).length > 0);
-
-      const { data: activePlan } = await supabase
-        .from("plans")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (activePlan) {
+      if (activePlan && !cancelled) {
         const { data: planDays } = await supabase
           .from("plan_days")
           .select("id, day_number")
@@ -221,13 +246,6 @@ export default function RecoveryPage() {
           .order("day_number");
 
         if (planDays && planDays.length > 0) {
-          const { count: completedPlanned } = await supabase
-            .from("workout_sessions")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.id)
-            .eq("status", "completed")
-            .not("plan_day_id", "is", null);
-
           const dayIndex = (completedPlanned ?? 0) % planDays.length;
           const nextDay = planDays[dayIndex];
           const { data: dayItems } = await supabase
@@ -238,16 +256,16 @@ export default function RecoveryPage() {
             .eq("plan_day_id", nextDay.id)
             .order("order_index");
 
-          const exerciseIds = (dayItems ?? []).map((item) => item.exercise_id);
-          const { data: exercises } = await supabase
-            .from("exercises")
-            .select("id, name")
-            .in("id", exerciseIds);
-          const nameMap = new Map((exercises ?? []).map((ex) => [ex.id, ex.name]));
+          if (dayItems && dayItems.length > 0 && !cancelled) {
+            const exerciseIds = dayItems.map((item) => item.exercise_id);
+            const { data: exercises } = await supabase
+              .from("exercises")
+              .select("id, name")
+              .in("id", exerciseIds);
+            const nameMap = new Map((exercises ?? []).map((ex) => [ex.id, ex.name]));
 
-          if (!cancelled) {
             setPlanItems(
-              (dayItems ?? []).map((item) => ({
+              dayItems.map((item) => ({
                 ...item,
                 exercise_name: nameMap.get(item.exercise_id) ?? "Unknown exercise",
               })),
@@ -255,15 +273,6 @@ export default function RecoveryPage() {
           }
         }
       }
-
-      const { data: lastSession } = await supabase
-        .from("workout_sessions")
-        .select("id, started_at")
-        .eq("user_id", user.id)
-        .eq("status", "completed")
-        .order("started_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
 
       if (lastSession && !cancelled) {
         const { data: lastSets } = await supabase
@@ -370,11 +379,7 @@ export default function RecoveryPage() {
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <RecoveryLoadingSkeleton />;
   }
 
   return (
@@ -600,11 +605,13 @@ export default function RecoveryPage() {
         </CardContent>
       </Card>
 
-      <Paywall
-        open={showPaywall}
-        onOpenChange={setShowPaywall}
-        feature="recovery_adjustment"
-      />
+      {showPaywall && (
+        <Paywall
+          open={showPaywall}
+          onOpenChange={setShowPaywall}
+          feature="recovery_adjustment"
+        />
+      )}
     </div>
   );
 }

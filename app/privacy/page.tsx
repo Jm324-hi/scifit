@@ -2,15 +2,15 @@ import type { Metadata } from "next";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - SciFit",
+  title: "Privacy Policy - Kineroz",
   description:
-    "Learn how SciFit collects, uses, and protects your personal data.",
+    "Learn how Kineroz collects, uses, and protects your personal data.",
 };
 
 const sections = [
   {
     title: "1. What Data We Collect",
-    content: `SciFit collects information you voluntarily provide when using our service, including:
+    content: `Kineroz collects information you voluntarily provide when using our service, including:
 
 • Account information — email address and hashed password used for authentication.
 • Training data — workout logs, exercise selections, sets, reps, weight, and RPE values you record during training sessions.
@@ -21,7 +21,7 @@ We do not collect location data, contacts, or any information unrelated to your 
   },
   {
     title: "2. How We Use Your Data",
-    content: `Your data is used exclusively to power the SciFit experience:
+    content: `Your data is used exclusively to power the Kineroz experience:
 
 • Personalized training plans — your profile preferences drive the plan generator so your program matches your goals and schedule.
 • Progressive overload engine — workout history is analyzed to recommend weight and volume adjustments for your next session.
@@ -42,7 +42,7 @@ We retain your data for as long as your account is active. You may request delet
   },
   {
     title: "4. Third-Party Services",
-    content: `SciFit integrates with the following third-party services to operate:
+    content: `Kineroz integrates with the following third-party services to operate:
 
 • Supabase — authentication, database storage, and real-time data management.
 • Potential AI services — we may use AI-powered analysis to improve training recommendations in the future. If implemented, data shared with AI providers will be anonymized and never include personally identifiable information.
@@ -62,23 +62,23 @@ Requests will be processed within 30 days in compliance with applicable data pro
   },
   {
     title: "6. Cookies",
-    content: `SciFit uses only essential cookies required to maintain your authentication session and basic application functionality. We do not use tracking cookies, third-party advertising cookies, or analytics cookies that identify individual users.`,
+    content: `Kineroz uses only essential cookies required to maintain your authentication session and basic application functionality. We do not use tracking cookies, third-party advertising cookies, or analytics cookies that identify individual users.`,
   },
   {
     title: "7. Disclaimer",
-    content: `SciFit provides fitness guidance based on exercise science principles and user-reported data. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting any new exercise program, especially if you have pre-existing medical conditions or injuries.
+    content: `Kineroz provides fitness guidance based on exercise science principles and user-reported data. It is not a substitute for professional medical advice, diagnosis, or treatment. Always consult a qualified healthcare provider before starting any new exercise program, especially if you have pre-existing medical conditions or injuries.
 
-By using SciFit, you acknowledge that all training decisions are made at your own risk.`,
+By using Kineroz, you acknowledge that all training decisions are made at your own risk.`,
   },
   {
     title: "8. Policy Updates",
-    content: `We may update this privacy policy from time to time to reflect changes in our practices or applicable regulations. For significant changes, we will notify you via in-app notification. Continued use of SciFit after an update constitutes acceptance of the revised policy.`,
+    content: `We may update this privacy policy from time to time to reflect changes in our practices or applicable regulations. For significant changes, we will notify you via in-app notification. Continued use of Kineroz after an update constitutes acceptance of the revised policy.`,
   },
   {
     title: "9. Contact",
     content: `If you have questions about this privacy policy or wish to exercise your data rights, please contact us at:
 
-Email: privacy@scifit.app
+Email: privacy@kineroz.com
 
 We aim to respond to all inquiries within 5 business days.`,
   },
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
       <Card>
         <CardContent className="space-y-8 pt-6">
           <p className="text-sm leading-relaxed text-muted-foreground">
-            SciFit (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is committed
+            Kineroz (&quot;we&quot;, &quot;our&quot;, &quot;us&quot;) is committed
             to protecting your privacy. This policy explains what data we
             collect, how we use it, and your rights regarding that data.
           </p>

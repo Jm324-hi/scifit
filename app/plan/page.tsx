@@ -1,28 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  ClipboardList,
-  Loader2,
-  RefreshCw,
-  Pencil,
-  Trash2,
-  ChevronUp,
-  ChevronDown,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { RefreshCw, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -31,16 +14,19 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { ExerciseSelector } from "@/components/ExerciseSelector";
-import { ExerciseSubstitute } from "@/components/ExerciseSubstitute";
-import { AiCoachDialog } from "@/components/AiCoachDialog";
-import { Paywall } from "@/components/Paywall";
+import { AiCoachDialog, Paywall } from "@/components/dynamic-imports";
+import { PlanLoadingSkeleton } from "@/components/loading/page-skeletons";
+import { EmptyPlan } from "@/components/plan/EmptyPlan";
+import { DayCard } from "@/components/plan/DayCard";
+import type {
+  DayWithItems,
+  ItemRow,
+  ItemWithExercise,
+} from "@/components/plan/types";
 import { createClient } from "@/lib/supabase/client";
 import { generatePlan, isCompound } from "@/lib/plan-generator";
 import { isPro as checkIsPro } from "@/lib/subscription";
 import type { Exercise } from "@/lib/exercise-substitution";
-
-/* ─── Types ─────────────────────────────────────────── */
 
 interface PlanRow {
   id: string;
@@ -51,31 +37,6 @@ interface PlanRow {
   duration_weeks: number;
   split_type: string;
   is_active: boolean;
-}
-
-interface ItemRow {
-  id: string;
-  plan_day_id: string;
-  exercise_id: string;
-  order_index: number;
-  sets: number;
-  rep_range_min: number;
-  rep_range_max: number;
-  target_rpe: number;
-  notes: string | null;
-}
-
-interface ItemWithExercise extends ItemRow {
-  exercise: Exercise;
-}
-
-interface DayWithItems {
-  id: string;
-  plan_id: string;
-  day_number: number;
-  name: string;
-  focus: string;
-  items: ItemWithExercise[];
 }
 
 /* ─── Label maps ────────────────────────────────────── */
@@ -90,6 +51,7 @@ const GOAL_LABELS: Record<string, string> = {
   muscle: "Muscle Building",
   strength: "Strength",
   fat_loss: "Fat Loss",
+  general: "General Fitness",
 };
 
 /* ─── Component ─────────────────────────────────────── */
@@ -184,22 +146,18 @@ export default function PlanPage() {
       }
       setUserId(user.id);
 
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-      if (!cancelled) setProfile(prof);
+      const [profRes, proStatus, exDataRes] = await Promise.all([
+        supabase.from("profiles").select("*").eq("id", user.id).single(),
+        checkIsPro(supabase, user.id),
+        supabase.from("exercises").select("*").order("name"),
+      ]);
 
-      const proStatus = await checkIsPro(supabase, user.id);
-      if (!cancelled) setUserIsPro(proStatus);
-
-      const { data: exData } = await supabase
-        .from("exercises")
-        .select("*")
-        .order("name");
-      const exercises = (exData ?? []) as Exercise[];
+      const prof = profRes.data;
+      const exercises = (exDataRes.data ?? []) as Exercise[];
       const exerciseMap = new Map(exercises.map((e) => [e.id, e]));
+
+      if (!cancelled) setProfile(prof);
+      if (!cancelled) setUserIsPro(proStatus);
       if (!cancelled) {
         setAllExercises(exercises);
         setExMap(exerciseMap);
@@ -501,43 +459,18 @@ export default function PlanPage() {
   /* ─── Render: Loading ─── */
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <PlanLoadingSkeleton />;
   }
 
   /* ─── Render: Empty state ─── */
 
   if (!plan) {
     return (
-      <div className="space-y-6">
-        <h1 className="text-2xl font-bold tracking-tight">Training Plan</h1>
-        <Card>
-          <CardContent className="flex flex-col items-center gap-5 py-16 text-center">
-            <ClipboardList className="size-12 text-muted-foreground/40" />
-            <div className="space-y-1">
-              <p className="font-medium">No training plan yet</p>
-              <p className="text-sm text-muted-foreground">
-                Generate a personalized plan based on your profile.
-              </p>
-            </div>
-            <Button
-              onClick={handleGenerate}
-              size="lg"
-              disabled={generating || !profile}
-            >
-              {generating ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Sparkles className="size-4" />
-              )}
-              {generating ? "Generating..." : "Generate Your Plan"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <EmptyPlan
+        generating={generating}
+        hasProfile={!!profile}
+        onGenerate={handleGenerate}
+      />
     );
   }
 
@@ -627,114 +560,16 @@ export default function PlanPage() {
 
       {/* Day cards */}
       {days.map((day) => (
-        <Card key={day.id}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <span className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                {day.day_number}
-              </span>
-              {day.name}
-            </CardTitle>
-            <CardDescription>{day.focus}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-1">
-            {day.items.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">
-                No exercises in this day.
-              </p>
-            )}
-
-            {day.items.map((item, idx) => (
-              <div
-                key={item.id}
-                className="group flex items-start gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent/50"
-              >
-                <span className="mt-0.5 w-5 shrink-0 text-center text-sm font-medium text-muted-foreground">
-                  {idx + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-medium leading-tight">
-                    {item.exercise.name}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm text-muted-foreground">
-                      {item.sets} × {item.rep_range_min}-{item.rep_range_max}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className="text-[11px]"
-                    >
-                      RPE {item.target_rpe}
-                    </Badge>
-                    {item.notes && (
-                      <span className="text-xs text-muted-foreground italic">
-                        {item.notes}
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={idx === 0}
-                    onClick={() => handleMove(day.id, item.id, "up")}
-                  >
-                    <ChevronUp className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    disabled={idx === day.items.length - 1}
-                    onClick={() => handleMove(day.id, item.id, "down")}
-                  >
-                    <ChevronDown className="size-3.5" />
-                  </Button>
-                  <ExerciseSubstitute
-                    exercise={item.exercise}
-                    allExercises={allExercises}
-                    onSwap={(ex) =>
-                      handleSwapExercise(day.id, item.id, ex)
-                    }
-                    trigger={
-                      <Button variant="ghost" size="icon-sm">
-                        <RefreshCw className="size-3.5" />
-                      </Button>
-                    }
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => openEdit(item)}
-                  >
-                    <Pencil className="size-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className="text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteItem(day.id, item.id)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            <div className="pt-2">
-              <ExerciseSelector
-                exercises={allExercises}
-                onSelect={(ex) => handleAddExercise(day.id, ex)}
-                trigger={
-                  <Button variant="ghost" size="sm" className="w-full">
-                    <Plus className="size-3" />
-                    Add Exercise
-                  </Button>
-                }
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <DayCard
+          key={day.id}
+          day={day}
+          allExercises={allExercises}
+          onMove={handleMove}
+          onSwapExercise={handleSwapExercise}
+          onDeleteItem={handleDeleteItem}
+          onAddExercise={handleAddExercise}
+          onEditItem={openEdit}
+        />
       ))}
 
       {/* ── Edit Dialog ── */}
@@ -842,11 +677,13 @@ export default function PlanPage() {
         </DialogContent>
       </Dialog>
 
-      <Paywall
-        open={showPaywall}
-        onOpenChange={setShowPaywall}
-        feature="unlimited_plans"
-      />
+      {showPaywall && (
+        <Paywall
+          open={showPaywall}
+          onOpenChange={setShowPaywall}
+          feature="unlimited_plans"
+        />
+      )}
     </div>
   );
 }

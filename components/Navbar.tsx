@@ -10,6 +10,7 @@ import {
   Heart,
   TrendingUp,
   History,
+  BarChart3,
   Menu,
   LogOut,
   LogIn,
@@ -34,6 +35,7 @@ const navLinks = [
   { href: "/recovery", label: "Recovery", icon: Heart },
   { href: "/progress", label: "Progress", icon: TrendingUp },
   { href: "/history", label: "History", icon: History },
+  { href: "/report", label: "Report", icon: BarChart3 },
 ] as const;
 
 export default function Navbar() {
@@ -72,7 +74,7 @@ export default function Navbar() {
           href="/"
           className="text-xl font-extrabold tracking-tight text-primary transition-colors hover:text-primary/80"
         >
-          SciFit
+          Kineroz
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
@@ -97,24 +99,26 @@ export default function Navbar() {
               );
             })}
 
-          {user ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleSignOut}
-              className="ml-2 text-muted-foreground hover:text-destructive"
-            >
-              <LogOut className="mr-1.5 size-4" />
-              Sign Out
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/login" className="text-muted-foreground">
-                <LogIn className="mr-1.5 size-4" />
-                Sign In
-              </Link>
-            </Button>
-          )}
+          <div className="ml-2 min-w-[7rem]">
+            {user ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleSignOut}
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <LogOut className="mr-1.5 size-4" />
+                Sign Out
+              </Button>
+            ) : (
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/login" className="text-muted-foreground">
+                  <LogIn className="mr-1.5 size-4" />
+                  Sign In
+                </Link>
+              </Button>
+            )}
+          </div>
         </nav>
 
         <Sheet open={open} onOpenChange={setOpen}>
@@ -132,7 +136,7 @@ export default function Navbar() {
           <SheetContent side="right" className="w-72">
             <SheetHeader>
               <SheetTitle className="text-lg font-extrabold tracking-tight text-primary">
-                SciFit
+                Kineroz
               </SheetTitle>
             </SheetHeader>
 
