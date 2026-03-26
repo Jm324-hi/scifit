@@ -66,7 +66,7 @@ export default function RegisterPage() {
   function isNetworkError(msg?: string): boolean {
     if (!msg) return false;
     const lower = msg.toLowerCase();
-    return lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout");
+    return lower.includes("failed to fetch") || lower.includes("load failed") || lower.includes("network") || lower.includes("timeout");
   }
 
   async function handleSubmit(e: React.FormEvent) {

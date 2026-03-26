@@ -29,6 +29,7 @@ export default function ResetPasswordPage() {
     const lower = msg.toLowerCase();
     return (
       lower.includes("failed to fetch") ||
+      lower.includes("load failed") ||
       lower.includes("network") ||
       lower.includes("timeout")
     );
