@@ -38,28 +38,66 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function attemptSignIn(): Promise<{ success: boolean; message?: string }> {
+    const supabase = createClient();
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 10_000),
+    );
+
+    const { error } = await Promise.race([
+      supabase.auth.signInWithPassword({ email, password }),
+      timeout,
+    ]);
+
+    if (error) return { success: false, message: error.message };
+    return { success: true };
+  }
+
+  function isNetworkError(msg?: string): boolean {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const MAX_RETRIES = 2;
 
-      if (error) {
-        setError(error.message);
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const result = await attemptSignIn();
+
+        if (result.success) {
+          router.push("/dashboard");
+          return;
+        }
+
+        if (!isNetworkError(result.message)) {
+          setError(result.message ?? "Sign in failed.");
+          setLoading(false);
+          return;
+        }
+
+        if (attempt < MAX_RETRIES - 1) continue;
+
+        setError("Network connection failed. Please check your internet connection and try again.");
         setLoading(false);
         return;
-      }
+      } catch (err) {
+        if (attempt < MAX_RETRIES - 1) continue;
 
-      router.push("/dashboard");
-    } catch {
-      setError("Something went wrong. Please try again.");
-      setLoading(false);
+        const msg = err instanceof Error ? err.message : "";
+        setError(
+          isNetworkError(msg)
+            ? "Network connection failed. Please check your internet connection and try again."
+            : "Something went wrong. Please try again.",
+        );
+        setLoading(false);
+      }
     }
   }
 
@@ -145,6 +183,12 @@ export default function LoginPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
+              <Link
+                href="/forgot-password"
+                className="text-center text-sm font-medium text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
               <p className="text-center text-sm text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <Link

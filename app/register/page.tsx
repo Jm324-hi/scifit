@@ -3,16 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import {
-  Mail,
-  Lock,
-  UserPlus,
-  TrendingUp,
-  Heart,
-  Brain,
-  Dumbbell,
-  Check,
-} from "lucide-react";
+import { Mail, Lock, UserPlus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,6 +33,42 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  async function attemptSignUp(): Promise<{
+    success: boolean;
+    message?: string;
+    userId?: string;
+  }> {
+    const supabase = createClient();
+
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), 15_000),
+    );
+
+    const { data: signUpData, error } = await Promise.race([
+      supabase.auth.signUp({ email, password }),
+      timeout,
+    ]);
+
+    if (error) return { success: false, message: error.message };
+
+    if (signUpData?.user) {
+      await Promise.race([
+        createFreeSubscription(supabase, signUpData.user.id),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 5_000),
+        ),
+      ]).catch(() => {});
+    }
+
+    return { success: true };
+  }
+
+  function isNetworkError(msg?: string): boolean {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return lower.includes("failed to fetch") || lower.includes("network") || lower.includes("timeout");
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -58,27 +85,39 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    try {
-      const supabase = createClient();
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+    const MAX_RETRIES = 2;
 
-      if (error) {
-        setError(error.message);
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const result = await attemptSignUp();
+
+        if (result.success) {
+          router.push("/onboarding");
+          return;
+        }
+
+        if (!isNetworkError(result.message)) {
+          setError(result.message ?? "Registration failed.");
+          setLoading(false);
+          return;
+        }
+
+        if (attempt < MAX_RETRIES - 1) continue;
+
+        setError("Network connection failed. Please check your internet connection and try again.");
         setLoading(false);
         return;
-      }
+      } catch (err) {
+        if (attempt < MAX_RETRIES - 1) continue;
 
-      if (signUpData.user) {
-        await createFreeSubscription(supabase, signUpData.user.id);
+        const msg = err instanceof Error ? err.message : "";
+        setError(
+          isNetworkError(msg)
+            ? "Network connection failed. Please check your internet connection and try again."
+            : "Something went wrong. Please try again.",
+        );
+        setLoading(false);
       }
-
-      router.push("/onboarding");
-    } catch {
-      setError("Something went wrong. Please try again.");
-      setLoading(false);
     }
   }
 

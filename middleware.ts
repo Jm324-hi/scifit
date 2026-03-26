@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const publicPaths = ["/", "/login", "/register", "/privacy", "/exercises"];
+const publicPaths = ["/", "/login", "/register", "/privacy", "/exercises", "/forgot-password", "/reset-password", "/auth/callback"];
 
 const profileRequiredPaths = [
   "/dashboard",
@@ -39,16 +39,26 @@ export async function middleware(request: NextRequest) {
   );
 
   if (user && needsProfile) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", user.id)
-      .single();
+    try {
+      const profileQuery = supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", user.id)
+        .single();
 
-    if (!profile) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/onboarding";
-      return NextResponse.redirect(url);
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 3000),
+      );
+
+      const { data: profile } = await Promise.race([profileQuery, timeout]);
+
+      if (!profile) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/onboarding";
+        return NextResponse.redirect(url);
+      }
+    } catch {
+      // On timeout or network error, let the user through rather than blocking
     }
   }
 

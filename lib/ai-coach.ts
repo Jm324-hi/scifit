@@ -6,9 +6,9 @@ export interface PromptPair {
 }
 
 const DISCLAIMER =
-  "SciFit provides fitness guidance, not medical advice. Consult a healthcare professional for medical concerns.";
+  "Kineroz provides fitness guidance, not medical advice. Consult a healthcare professional for medical concerns.";
 
-const OUTPUT_FORMAT_INSTRUCTION = `You are SciFit AI Coach — a concise, evidence-based fitness assistant.
+const OUTPUT_FORMAT_INSTRUCTION = `You are Kineroz AI Coach — a concise, evidence-based fitness assistant.
 
 Always respond using this exact structure:
 

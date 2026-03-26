@@ -62,7 +62,7 @@ export function Paywall({ open, onOpenChange, feature }: PaywallProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Crown className="size-5 text-yellow-500" />
-            Upgrade to SciFit Pro
+            Upgrade to Kineroz Pro
           </DialogTitle>
           <DialogDescription>
             Unlock the full potential of science-based training
