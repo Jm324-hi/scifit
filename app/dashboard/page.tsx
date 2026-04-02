@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getReadinessLevel } from "@/lib/recovery-engine";
+import { MuscleHeatmap, type MuscleRecoveryData, type RecoveryLevel } from "@/components/dashboard/MuscleHeatmap";
 
 const goalLabels: Record<string, string> = {
   muscle: "Muscle Building",
@@ -115,6 +116,7 @@ export default async function DashboardPage() {
     progressSessionsRes,
     todayRecoveryLogRes,
     completedPlannedRes,
+    exercisesRes,
   ] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).single(),
     supabase
@@ -160,6 +162,7 @@ export default async function DashboardPage() {
       .eq("user_id", user.id)
       .eq("status", "completed")
       .not("plan_day_id", "is", null),
+    supabase.from("exercises").select("id, primary_muscle, secondary_muscles"),
   ]);
 
   const { data: profile } = profileRes;
@@ -171,6 +174,7 @@ export default async function DashboardPage() {
   const { data: progressSessions } = progressSessionsRes;
   const { data: todayRecoveryLog } = todayRecoveryLogRes;
   const { count: completedPlanned } = completedPlannedRes;
+  const { data: exercises } = exercisesRes;
 
   let nextDayName = "";
   let nextDayFocus = "";
@@ -287,6 +291,92 @@ export default async function DashboardPage() {
   const readinessInfo = todayRecoveryLog
     ? getReadinessLevel(todayRecoveryLog.readiness)
     : null;
+
+  // Calculate Muscle Heatmap Data
+  const muscleFatigueData: Record<keyof MuscleRecoveryData, number> = {
+    chest: 0,
+    shoulders: 0,
+    triceps: 0,
+    back: 0,
+    biceps: 0,
+    traps: 0,
+    forearms: 0,
+    quads: 0,
+    glutes: 0,
+    hamstrings: 0,
+    calves: 0,
+    core: 0,
+  };
+
+  const exerciseMap = new Map(
+    (exercises ?? []).map(
+      (e: { id: string; primary_muscle: string; secondary_muscles: string[] }) => [
+        e.id,
+        { primary: e.primary_muscle, secondary: e.secondary_muscles },
+      ]
+    )
+  );
+
+  const nowMs = Date.now();
+  const hours72 = 72 * 60 * 60 * 1000;
+
+  for (const session of completedSessions) {
+    const startedMs = new Date(session.started_at).getTime();
+    const diffMs = nowMs - startedMs;
+
+    if (diffMs > hours72) continue;
+
+    const hoursAgo = diffMs / (60 * 60 * 1000);
+    // Weight fatigue: 1.0 if recent, linearly dropping to 0 at 72 hours
+    const timeWeight = Math.max(0, 1 - hoursAgo / 72);
+
+    for (const set of session.workout_sets ?? []) {
+      if (!set.completed) continue;
+
+      const ex = exerciseMap.get(set.exercise_id);
+      if (ex) {
+        const prim = ex.primary as keyof MuscleRecoveryData;
+        if (muscleFatigueData[prim] !== undefined) {
+          muscleFatigueData[prim] += 1 * timeWeight;
+        }
+
+        for (const sec of ex.secondary) {
+          const s = sec as keyof MuscleRecoveryData;
+          if (muscleFatigueData[s] !== undefined) {
+            muscleFatigueData[s] += 0.5 * timeWeight;
+          }
+        }
+      }
+    }
+  }
+
+  const muscleRecoveryData: MuscleRecoveryData = {
+    chest: "fresh",
+    shoulders: "fresh",
+    triceps: "fresh",
+    back: "fresh",
+    biceps: "fresh",
+    traps: "fresh",
+    forearms: "fresh",
+    quads: "fresh",
+    glutes: "fresh",
+    hamstrings: "fresh",
+    calves: "fresh",
+    core: "fresh",
+  };
+
+  // Adjust thresholds slightly based on global readiness score
+  const baseReadiness = todayRecoveryLog?.readiness ?? 80;
+  const readinessMultiplier = baseReadiness < 50 ? 1.5 : baseReadiness < 75 ? 1.2 : 1.0;
+
+  for (const [m, fatigue] of Object.entries(muscleFatigueData)) {
+    const adjustedFatigue = fatigue * readinessMultiplier;
+    if (adjustedFatigue > 5.0) {
+      muscleRecoveryData[m as keyof MuscleRecoveryData] = "fatigued";
+    } else if (adjustedFatigue > 2.0) {
+      muscleRecoveryData[m as keyof MuscleRecoveryData] = "recovering";
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -499,8 +589,13 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
+        {/* Muscle Heatmap */}
+        <div className="sm:col-span-2 lg:col-span-1">
+          <MuscleHeatmap data={muscleRecoveryData} />
+        </div>
+
         {/* Progress Summary */}
-        <Link href="/progress" className="block">
+        <Link href="/progress" className="block sm:col-span-2 lg:col-span-1">
           <Card className="h-full transition-colors hover:bg-muted/20">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

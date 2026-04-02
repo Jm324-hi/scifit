@@ -21,9 +21,11 @@ import { WorkoutLoadingSkeleton } from "@/components/loading/page-skeletons";
 import { RestTimer } from "@/components/workout/RestTimer";
 import { ExerciseCard } from "@/components/workout/ExerciseCard";
 import { FinishDialog } from "@/components/workout/FinishDialog";
+import { SmartWarmupDialog } from "@/components/workout/SmartWarmupDialog";
 import type { ExerciseGroup, SetRecord } from "@/components/workout/types";
 import { createClient } from "@/lib/supabase/client";
-import type { Exercise } from "@/lib/exercise-substitution";
+import { findSubstitutes, type Exercise } from "@/lib/exercise-substitution";
+import { useGymProfiles } from "@/lib/use-gym-profiles";
 import {
   calculateProgression,
   detectPR,
@@ -108,6 +110,7 @@ function getLocalDateKey(date = new Date()): string {
 
 export default function WorkoutPage() {
   const supabase = createClient();
+  const { activeProfile } = useGymProfiles();
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
@@ -140,6 +143,10 @@ export default function WorkoutPage() {
   const [userIsPro, setUserIsPro] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [expressMode, setExpressMode] = useState(false);
+  const [showWarmup, setShowWarmup] = useState(false);
+
+  const [restExerciseId, setRestExerciseId] = useState<string | null>(null);
+  const [restGroupIndex, setRestGroupIndex] = useState<number | null>(null);
 
   /* ───────────── Init ───────────── */
 
@@ -489,8 +496,24 @@ export default function WorkoutPage() {
     const newGroups: ExerciseGroup[] = [];
 
     for (const item of itemsForToday) {
-      const exercise = allExercises.find((e) => e.id === item.exercise_id);
+      let exercise = allExercises.find((e) => e.id === item.exercise_id);
       if (!exercise) continue;
+
+      // Smart substitution based on active Gym Profile
+      const allowedEq = activeProfile?.equipment || [];
+      const needsSwap =
+        allowedEq.length > 0 &&
+        exercise.equipment !== "bodyweight" &&
+        !allowedEq.includes(exercise.equipment);
+
+      if (needsSwap) {
+        const subs = findSubstitutes(exercise, allExercises, allowedEq);
+        if (subs.length > 0) {
+          exercise = subs[0];
+          item.exercise_id = exercise.id; // update for logging sets below
+          item.notes = (item.notes ? item.notes + " " : "") + "(Auto-swapped for profile)";
+        }
+      }
 
       const setsData = Array.from({ length: item.sets }, (_, i) => ({
         session_id: newSession.id,
@@ -606,7 +629,11 @@ export default function WorkoutPage() {
 
     updateLocal(gi, si, "completed", done);
     await saveField(set.id, { completed: done });
-    if (done) startRest();
+    if (done) {
+      setRestExerciseId(groups[gi].exercise.id);
+      setRestGroupIndex(gi);
+      startRest();
+    }
   }
 
   async function handleSwap(gi: number, newEx: Exercise) {
@@ -876,7 +903,7 @@ export default function WorkoutPage() {
                 )}
 
                 <Button
-                  onClick={startPlannedWorkout}
+                  onClick={() => setShowWarmup(true)}
                   size="lg"
                   className="w-full"
                 >
@@ -896,6 +923,19 @@ export default function WorkoutPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {nextPlanDay && (
+          <SmartWarmupDialog
+            open={showWarmup}
+            onOpenChange={setShowWarmup}
+            plannedExercises={
+              nextPlanDay.items
+                .map((i) => allExercises.find((e) => e.id === i.exercise_id))
+                .filter((e): e is Exercise => !!e)
+            }
+            onStartWorkout={startPlannedWorkout}
+          />
+        )}
       </div>
     );
   }
@@ -957,6 +997,9 @@ export default function WorkoutPage() {
         restRemaining={restRemaining}
         restActive={restActive}
         restDone={restDone}
+        currentGroup={restGroupIndex !== null ? groups[restGroupIndex] : undefined}
+        lastRecord={restExerciseId ? lastRecordsByExercise[restExerciseId] : null}
+        planItem={restExerciseId ? planItemsByExercise[restExerciseId] : undefined}
         onPresetSelect={(t) => {
           setRestDuration(t);
           if (!restActive) setRestRemaining(t);

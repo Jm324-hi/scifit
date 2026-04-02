@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { AiCoachDialog } from "@/components/dynamic-imports";
 import { ExerciseSubstitute } from "@/components/ExerciseSubstitute";
+import { ExerciseDemoDialog } from "@/components/workout/ExerciseDemoDialog";
 import type { Exercise } from "@/lib/exercise-substitution";
 import type { ExerciseGroup, SetRecord, LastRecord } from "./types";
 import type { PlanItemTarget } from "@/lib/progression-engine";
@@ -81,6 +82,7 @@ export function ExerciseCard({
           </Badge>
         </CardTitle>
         <CardAction className="flex items-center gap-1">
+          <ExerciseDemoDialog exercise={g.exercise} />
           <AiCoachDialog
             context="workout"
             contextData={{

@@ -26,6 +26,7 @@ interface SeedExercise {
   difficulty: number;
   description: string;
   tips: string;
+  video_id?: string | null;
 }
 
 const exercises: SeedExercise[] = [
@@ -40,6 +41,7 @@ const exercises: SeedExercise[] = [
     description:
       "Lie on a flat bench and press a barbell from chest level to full arm extension.",
     tips: "Keep your shoulder blades retracted and feet flat on the floor. Control the descent.",
+    video_id: "rxEMKXW2Wqs", // Example video ID
   },
   {
     name: "Incline Barbell Bench Press",
@@ -496,6 +498,7 @@ const exercises: SeedExercise[] = [
     description:
       "Place a barbell on the upper back and squat down until hips are below knee level.",
     tips: "Drive knees out over toes. Keep chest up and core braced. Aim for at least parallel depth.",
+    video_id: "bEv6CCg2BC8", // Example video ID
   },
   {
     name: "Front Squat",
@@ -654,6 +657,7 @@ const exercises: SeedExercise[] = [
     description:
       "Lift a barbell from the floor to hip level by extending the hips and knees.",
     tips: "Keep the bar close to the body. Brace your core, push the floor away, and lock out with the glutes.",
+    video_id: "wYREQkVtvEc", // Example video ID
   },
   {
     name: "Romanian Deadlift",

@@ -37,6 +37,7 @@ create table if not exists public.exercises (
   difficulty integer not null check (difficulty between 1 and 5),
   description text not null,
   tips text not null,
+  video_id text,
   created_at timestamptz not null default now()
 );
 

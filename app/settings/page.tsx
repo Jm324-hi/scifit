@@ -25,6 +25,7 @@ import {
 } from "@/lib/subscription";
 import { Paywall } from "@/components/dynamic-imports";
 import { SettingsLoadingSkeleton } from "@/components/loading/page-skeletons";
+import { GymProfilesManager } from "@/components/settings/GymProfilesManager";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -101,6 +102,8 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <GymProfilesManager />
 
         <Card>
           <CardHeader>

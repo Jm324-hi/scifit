@@ -8,6 +8,7 @@ export interface Exercise {
   difficulty: number;
   description: string;
   tips: string;
+  video_id?: string | null;
 }
 
 const EQUIPMENT_SIMILARITY: Record<string, string[]> = {
