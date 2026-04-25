@@ -22,7 +22,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
+import { signInAction } from "@/app/auth/actions";
+import {
+  callAction,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/call-action";
 
 const highlights = [
   { icon: TrendingUp, text: "Progressive overload tracking" },
@@ -38,66 +43,26 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function attemptSignIn(): Promise<{ success: boolean; message?: string }> {
-    const supabase = createClient();
-
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 10_000),
-    );
-
-    const { error } = await Promise.race([
-      supabase.auth.signInWithPassword({ email, password }),
-      timeout,
-    ]);
-
-    if (error) return { success: false, message: error.message };
-    return { success: true };
-  }
-
-  function isNetworkError(msg?: string): boolean {
-    if (!msg) return false;
-    const lower = msg.toLowerCase();
-    return lower.includes("failed to fetch") || lower.includes("load failed") || lower.includes("network") || lower.includes("timeout");
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const MAX_RETRIES = 2;
+    try {
+      const result = await callAction(() => signInAction(email, password));
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const result = await attemptSignIn();
-
-        if (result.success) {
-          router.push("/dashboard");
-          return;
-        }
-
-        if (!isNetworkError(result.message)) {
-          setError(result.message ?? "Sign in failed.");
-          setLoading(false);
-          return;
-        }
-
-        if (attempt < MAX_RETRIES - 1) continue;
-
-        setError("Network connection failed. Please check your internet connection and try again.");
-        setLoading(false);
+      if (result.ok) {
+        router.push("/dashboard");
+        router.refresh();
         return;
-      } catch (err) {
-        if (attempt < MAX_RETRIES - 1) continue;
-
-        const msg = err instanceof Error ? err.message : "";
-        setError(
-          isNetworkError(msg)
-            ? "Network connection failed. Please check your internet connection and try again."
-            : "Something went wrong. Please try again.",
-        );
-        setLoading(false);
       }
+
+      setError(result.error);
+      setLoading(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setError(isNetworkError(msg) ? NETWORK_ERROR_MESSAGE : "Something went wrong. Please try again.");
+      setLoading(false);
     }
   }
 

@@ -77,6 +77,7 @@ export default function RootLayout({
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-svh flex-col antialiased`}
+        suppressHydrationWarning
       >
         <Navbar />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">

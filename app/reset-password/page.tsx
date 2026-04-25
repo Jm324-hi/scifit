@@ -15,7 +15,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
+import { resetPasswordAction } from "@/app/auth/actions";
+import {
+  callAction,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/call-action";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -23,17 +28,6 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  function isNetworkError(msg?: string): boolean {
-    if (!msg) return false;
-    const lower = msg.toLowerCase();
-    return (
-      lower.includes("failed to fetch") ||
-      lower.includes("load failed") ||
-      lower.includes("network") ||
-      lower.includes("timeout")
-    );
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -52,35 +46,19 @@ export default function ResetPasswordPage() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
+      const result = await callAction(() => resetPasswordAction(password));
 
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), 10_000),
-      );
-
-      const { error } = await Promise.race([
-        supabase.auth.updateUser({ password }),
-        timeout,
-      ]);
-
-      if (error) {
-        setError(
-          isNetworkError(error.message)
-            ? "Network connection failed. Please check your internet connection and try again."
-            : error.message,
-        );
-        setLoading(false);
+      if (result.ok) {
+        router.push("/dashboard");
+        router.refresh();
         return;
       }
 
-      router.push("/dashboard");
+      setError(result.error);
+      setLoading(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      setError(
-        isNetworkError(msg)
-          ? "Network connection failed. Please check your internet connection and try again."
-          : "Something went wrong. Please try again.",
-      );
+      setError(isNetworkError(msg) ? NETWORK_ERROR_MESSAGE : "Something went wrong. Please try again.");
       setLoading(false);
     }
   }

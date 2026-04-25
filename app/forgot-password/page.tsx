@@ -14,7 +14,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
+import { forgotPasswordAction } from "@/app/auth/actions";
+import {
+  callAction,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/call-action";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -22,69 +27,26 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
 
-  function isNetworkError(msg?: string): boolean {
-    if (!msg) return false;
-    const lower = msg.toLowerCase();
-    return (
-      lower.includes("failed to fetch") ||
-      lower.includes("load failed") ||
-      lower.includes("network") ||
-      lower.includes("timeout")
-    );
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const MAX_RETRIES = 2;
+    try {
+      const result = await callAction(() => forgotPasswordAction(email));
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const supabase = createClient();
-
-        const timeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 10_000),
-        );
-
-        const siteUrl =
-          typeof window !== "undefined" ? window.location.origin : "";
-
-        const { error } = await Promise.race([
-          supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${siteUrl}/auth/callback?next=/reset-password`,
-          }),
-          timeout,
-        ]);
-
-        if (error) {
-          if (!isNetworkError(error.message)) {
-            setError(error.message);
-            setLoading(false);
-            return;
-          }
-          if (attempt < MAX_RETRIES - 1) continue;
-          setError(
-            "Network connection failed. Please check your internet connection and try again.",
-          );
-          setLoading(false);
-          return;
-        }
-
+      if (result.ok) {
         setSent(true);
         setLoading(false);
         return;
-      } catch (err) {
-        if (attempt < MAX_RETRIES - 1) continue;
-        const msg = err instanceof Error ? err.message : "";
-        setError(
-          isNetworkError(msg)
-            ? "Network connection failed. Please check your internet connection and try again."
-            : "Something went wrong. Please try again.",
-        );
-        setLoading(false);
       }
+
+      setError(result.error);
+      setLoading(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setError(isNetworkError(msg) ? NETWORK_ERROR_MESSAGE : "Something went wrong. Please try again.");
+      setLoading(false);
     }
   }
 

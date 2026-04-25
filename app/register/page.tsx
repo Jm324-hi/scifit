@@ -15,8 +15,12 @@ import {
   CardContent,
   CardFooter,
 } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
-import { createFreeSubscription } from "@/lib/subscription";
+import { signUpAction } from "@/app/auth/actions";
+import {
+  callAction,
+  isNetworkError,
+  NETWORK_ERROR_MESSAGE,
+} from "@/lib/call-action";
 
 const benefits = [
   "Personalized training plans based on your profile",
@@ -32,42 +36,6 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  async function attemptSignUp(): Promise<{
-    success: boolean;
-    message?: string;
-    userId?: string;
-  }> {
-    const supabase = createClient();
-
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("timeout")), 15_000),
-    );
-
-    const { data: signUpData, error } = await Promise.race([
-      supabase.auth.signUp({ email, password }),
-      timeout,
-    ]);
-
-    if (error) return { success: false, message: error.message };
-
-    if (signUpData?.user) {
-      await Promise.race([
-        createFreeSubscription(supabase, signUpData.user.id),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("timeout")), 5_000),
-        ),
-      ]).catch(() => {});
-    }
-
-    return { success: true };
-  }
-
-  function isNetworkError(msg?: string): boolean {
-    if (!msg) return false;
-    const lower = msg.toLowerCase();
-    return lower.includes("failed to fetch") || lower.includes("load failed") || lower.includes("network") || lower.includes("timeout");
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -85,39 +53,21 @@ export default function RegisterPage() {
 
     setLoading(true);
 
-    const MAX_RETRIES = 2;
+    try {
+      const result = await callAction(() => signUpAction(email, password));
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        const result = await attemptSignUp();
-
-        if (result.success) {
-          router.push("/onboarding");
-          return;
-        }
-
-        if (!isNetworkError(result.message)) {
-          setError(result.message ?? "Registration failed.");
-          setLoading(false);
-          return;
-        }
-
-        if (attempt < MAX_RETRIES - 1) continue;
-
-        setError("Network connection failed. Please check your internet connection and try again.");
-        setLoading(false);
+      if (result.ok) {
+        router.push("/onboarding");
+        router.refresh();
         return;
-      } catch (err) {
-        if (attempt < MAX_RETRIES - 1) continue;
-
-        const msg = err instanceof Error ? err.message : "";
-        setError(
-          isNetworkError(msg)
-            ? "Network connection failed. Please check your internet connection and try again."
-            : "Something went wrong. Please try again.",
-        );
-        setLoading(false);
       }
+
+      setError(result.error);
+      setLoading(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      setError(isNetworkError(msg) ? NETWORK_ERROR_MESSAGE : "Something went wrong. Please try again.");
+      setLoading(false);
     }
   }
 
