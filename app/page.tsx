@@ -28,25 +28,25 @@ const features = [
     icon: TrendingUp,
     title: "Scientific Progress Engine",
     description:
-      "Automatically adjusts volume and intensity based on progressive overload principles. Every session is designed to drive measurable progress.",
+      "Adjusts volume and intensity using the ACSM FITT-VP model and progressive overload.",
   },
   {
     icon: Heart,
-    title: "Recovery-Driven Training",
+    title: "Recovery-Driven Autoregulation",
     description:
-      "Tracks sleep, stress, and soreness to calculate a readiness score. Your workout intensity adapts to how recovered you actually are.",
+      "A readiness score from sleep, stress, and soreness auto-adjusts your load.",
   },
   {
     icon: Brain,
     title: "Smart Plan Generator",
     description:
-      "Generates a periodized training plan based on your goals, schedule, equipment, and experience level — no guesswork required.",
+      "A periodized plan built around your goals, schedule, and equipment — no guesswork.",
   },
   {
     icon: Dumbbell,
     title: "Track Everything",
     description:
-      "Log every set, rep, and RPE. View personal records, weekly trends, and training streaks — all in one place.",
+      "Log every set and RPE. See PRs, weekly trends, and streaks in one place.",
   },
 ];
 
@@ -56,29 +56,29 @@ const steps = [
     icon: UserPlus,
     title: "Sign Up",
     description:
-      "Create your free account and tell us about your training goals, experience, and available equipment.",
+      "Tell us your goals, experience, and equipment.",
   },
   {
     step: "02",
     icon: ClipboardList,
     title: "Get Your Plan",
     description:
-      "Our plan generator builds a science-backed program tailored to your profile — ready to start immediately.",
+      "A science-backed program tailored to you — ready instantly.",
   },
   {
     step: "03",
     icon: Zap,
     title: "Train & Progress",
     description:
-      "Follow your plan, log recovery, and let the progression engine guide you to consistent, measurable gains.",
+      "Train, log recovery, and let the engine guide steady gains.",
   },
 ];
 
 const trustSignals = [
-  { icon: Shield, text: "Personalized plans" },
-  { icon: Heart, text: "Recovery-aware" },
-  { icon: TrendingUp, text: "Progressive overload logic" },
-  { icon: Brain, text: "No guesswork" },
+  { icon: Shield, text: "Injury-aware programming" },
+  { icon: Heart, text: "Recovery-driven autoregulation" },
+  { icon: TrendingUp, text: "Progressive overload (FITT-VP)" },
+  { icon: Brain, text: "Evidence-based, no guesswork" },
 ];
 
 const demoPlan = [
@@ -110,19 +110,19 @@ export default function Home() {
         <div className="flex flex-col gap-6">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border bg-muted/50 px-4 py-1.5 text-sm text-muted-foreground">
             <Zap className="size-3.5" />
-            Science-based training for real results
+            Evidence-based training & recovery
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl lg:text-6xl">
             Train Smarter.{" "}
-            <span className="text-primary">Progress Faster.</span>
+            <span className="text-primary">Come Back Stronger.</span>
           </h1>
-          <p className="max-w-xl text-lg text-muted-foreground">
-            Kineroz is your intelligent training assistant — grounded in
-            exercise science, it builds adaptive plans, tracks progressive
-            overload, and optimizes recovery so every effort counts.
+          <p className="max-w-md text-lg text-muted-foreground">
+            Your remote exercise-science companion — evidence-based plans that
+            adapt to your recovery and take you safely from rehab to performance.
           </p>
           <p className="text-sm text-muted-foreground">
-            For beginners, busy lifters, and recovery-focused athletes.
+            For anyone training back from injury, around niggles, or who just
+            wants to get stronger without breaking down.
           </p>
           <div className="flex flex-col gap-3 sm:flex-row">
             <Button asChild size="lg" className="text-base">
@@ -216,11 +216,10 @@ export default function Home() {
       <section className="space-y-12">
         <div className="space-y-2 text-center">
           <h2 className="text-3xl font-bold tracking-tight">
-            Everything you need to level up
+            Everything you need to train and recover well
           </h2>
           <p className="mx-auto max-w-xl text-muted-foreground">
-            Built on exercise science principles — not hype. Kineroz gives you
-            the tools that actually drive progress.
+            Built on exercise-science principles — not hype.
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2">
@@ -252,9 +251,8 @@ export default function Home() {
             See what your plan looks like
           </h2>
           <p className="mx-auto max-w-xl text-muted-foreground">
-            Here&apos;s an example 3-day Upper/Lower split generated by
-            Kineroz. Your actual plan adapts to your goals, equipment, and
-            recovery status.
+            An example 3-day split. Yours adapts to your goals, equipment, and
+            recovery.
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-3">
@@ -342,25 +340,25 @@ export default function Home() {
               icon: ClipboardList,
               title: "Plan Builder",
               description:
-                "Auto-generated periodized plan with full exercise swap, set/rep editing, and AI advisor.",
+                "Periodized plan with exercise swaps, set/rep editing, and an AI advisor.",
             },
             {
               icon: Dumbbell,
               title: "Workout Logger",
               description:
-                "Log sets, weight, and RPE in real-time with rest timer, PR detection, and progression suggestions.",
+                "Log sets and RPE with rest timer, PR detection, and progression cues.",
             },
             {
               icon: Heart,
               title: "Recovery Tracker",
               description:
-                "Daily check-in for sleep, soreness, and stress. Readiness score adapts your next workout.",
+                "Daily check-in for sleep, soreness, and stress sets your readiness score.",
             },
             {
               icon: BarChart3,
               title: "Progress Dashboard",
               description:
-                "PR board, weekly volume trends, training streaks, and muscle group balance.",
+                "PR board, volume trends, streaks, and muscle-group balance.",
             },
           ].map((screen) => (
             <div
@@ -386,8 +384,7 @@ export default function Home() {
         <div className="space-y-2 text-center">
           <h2 className="text-3xl font-bold tracking-tight">How it works</h2>
           <p className="mx-auto max-w-xl text-muted-foreground">
-            Get up and running in minutes — no complicated setup, no upfront
-            cost.
+            Up and running in minutes — no setup, no upfront cost.
           </p>
         </div>
         <div className="grid gap-8 sm:grid-cols-3">
@@ -415,10 +412,11 @@ export default function Home() {
       <section className="space-y-12">
         <div className="space-y-2 text-center">
           <h2 className="text-3xl font-bold tracking-tight">
-            Why science-based training?
+            From recovery to performance — backed by science
           </h2>
           <p className="mx-auto max-w-xl text-muted-foreground">
-            Every decision in Kineroz is backed by exercise science principles — not guesswork or trends.
+            Every decision in Kineroz maps to a recognized exercise-science
+            framework — so you can train hard and come back safely.
           </p>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -426,17 +424,17 @@ export default function Home() {
             {
               icon: TrendingUp,
               title: "Progressive Overload",
-              text: "Systematically increase stimulus over time — the most reliable driver of strength and hypertrophy gains.",
+              text: "Gradually increasing demand over time — the most reliable driver of strength.",
             },
             {
               icon: Heart,
-              title: "Recovery Integration",
-              text: "Training without accounting for recovery leads to plateaus. Kineroz adjusts load based on how you actually feel.",
+              title: "Recovery & Autoregulation",
+              text: "Load adapts to how recovered you are — the principle behind clinical telerehab.",
             },
             {
               icon: Clock,
-              title: "Periodization",
-              text: "Structured training phases prevent burnout and ensure continuous adaptation across weeks and months.",
+              title: "Periodization & Return-to-Train",
+              text: "Structured phases prevent burnout and re-injury, and ease you back after layoffs.",
             },
           ].map((item) => (
             <div
@@ -453,16 +451,29 @@ export default function Home() {
             </div>
           ))}
         </div>
+        <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <Button asChild variant="outline" size="lg" className="text-base">
+            <Link href="/science">
+              Explore the science
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg" className="text-base">
+            <Link href="/rehab">
+              Recover & prevent
+              <ArrowRight className="size-4" />
+            </Link>
+          </Button>
+        </div>
       </section>
 
       {/* ── Bottom CTA ── */}
       <section className="flex flex-col items-center gap-6 rounded-2xl border bg-muted/30 px-6 py-16 text-center">
         <h2 className="max-w-lg text-3xl font-bold tracking-tight">
-          Ready to start training smarter?
+          Ready to train smarter and come back stronger?
         </h2>
         <p className="max-w-md text-muted-foreground">
-          Join Kineroz for free and get a personalized, science-backed training
-          plan in under two minutes.
+          Get a personalized, science-backed plan in under two minutes.
         </p>
         <div className="flex items-center gap-3">
           {["Personalized plans", "Recovery-aware", "No credit card"].map(

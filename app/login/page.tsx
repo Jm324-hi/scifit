@@ -29,6 +29,9 @@ import {
   NETWORK_ERROR_MESSAGE,
 } from "@/lib/call-action";
 
+const devBypass =
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
+
 const highlights = [
   { icon: TrendingUp, text: "Progressive overload tracking" },
   { icon: Heart, text: "Recovery-driven training adjustments" },
@@ -67,7 +70,32 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-[70vh] items-center justify-center">
+    <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
+      {devBypass && (
+        <div className="w-full max-w-4xl rounded-lg border border-sky-500/30 bg-sky-500/5 px-4 py-3 text-sm">
+          <p className="font-medium text-sky-800 dark:text-sky-300">
+            Local dev — sign-in not required
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            Open the app directly. For full data, set{" "}
+            <code className="text-xs">DEV_EMAIL</code> /{" "}
+            <code className="text-xs">DEV_PASSWORD</code> in{" "}
+            <code className="text-xs">.env.local</code> (see env.local.example).
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => {
+              router.push("/dashboard");
+              router.refresh();
+            }}
+          >
+            Continue to Dashboard
+          </Button>
+        </div>
+      )}
       <div className="grid w-full max-w-4xl gap-8 lg:grid-cols-2 lg:gap-12">
         {/* Brand side */}
         <div className="hidden flex-col justify-center gap-6 lg:flex">

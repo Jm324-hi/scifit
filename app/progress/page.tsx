@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Progress",
@@ -14,6 +13,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/require-user";
+import DevModeEmpty from "@/components/DevModeEmpty";
 import { isPro as checkIsPro } from "@/lib/subscription";
 import { ProGate } from "@/components/Paywall";
 
@@ -74,10 +75,8 @@ function formatPattern(pattern: string): string {
 
 export default async function ProgressPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
+  if (!user) return <DevModeEmpty title="Progress — local dev" />;
 
   const [userIsPro, sessionsRes] = await Promise.all([
     checkIsPro(supabase, user.id),

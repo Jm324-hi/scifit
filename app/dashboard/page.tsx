@@ -28,6 +28,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/require-user";
+import DevModeEmpty from "@/components/DevModeEmpty";
 import { getReadinessLevel } from "@/lib/recovery-engine";
 import { MuscleHeatmap, type MuscleRecoveryData, type RecoveryLevel } from "@/components/dashboard/MuscleHeatmap";
 
@@ -98,11 +100,9 @@ function localDateKey(date = new Date()): string {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await requireUser(supabase);
 
-  if (!user) redirect("/login");
+  if (!user) return <DevModeEmpty title="Dashboard — local dev" />;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

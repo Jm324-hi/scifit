@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { isDevAuthBypass, tryDevAutoSignIn } from "@/lib/dev-auth";
 import { updateSession } from "@/lib/supabase/middleware";
 
-const publicPaths = ["/", "/login", "/register", "/privacy", "/exercises", "/forgot-password", "/reset-password", "/auth/callback"];
+const publicPaths = ["/", "/login", "/register", "/privacy", "/science", "/rehab", "/exercises", "/forgot-password", "/reset-password", "/auth/callback"];
 
 const profileRequiredPaths = [
   "/dashboard",
@@ -15,14 +16,26 @@ const profileRequiredPaths = [
 ];
 
 export async function middleware(request: NextRequest) {
-  const { user, supabase, supabaseResponse } = await updateSession(request);
+  let { user, supabase, supabaseResponse } = await updateSession(request);
   const { pathname } = request.nextUrl;
+  const devBypass = isDevAuthBypass(request);
+
+  if (devBypass && !user) {
+    const signedIn = await tryDevAutoSignIn(supabase);
+    if (signedIn) {
+      user = signedIn;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      user = session?.user ?? signedIn;
+    }
+  }
 
   const isPublic = publicPaths.some(
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
 
-  if (!isPublic && !user) {
+  if (!isPublic && !user && !devBypass) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -38,7 +51,7 @@ export async function middleware(request: NextRequest) {
     (p) => pathname === p || pathname.startsWith(p + "/")
   );
 
-  if (user && needsProfile) {
+  if (user && needsProfile && !devBypass) {
     try {
       const profileQuery = supabase
         .from("profiles")

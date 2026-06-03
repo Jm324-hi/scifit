@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import {
   BarChart3,
   Trophy,
@@ -18,6 +17,8 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/require-user";
+import DevModeEmpty from "@/components/DevModeEmpty";
 import { getReadinessLevel } from "@/lib/recovery-engine";
 
 export const metadata: Metadata = {
@@ -66,10 +67,8 @@ function formatDate(iso: string): string {
 
 export default async function WeeklyReportPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const user = await requireUser(supabase);
+  if (!user) return <DevModeEmpty title="Report — local dev" />;
 
   const now = new Date();
   const weekStart = startOfWeek(now);

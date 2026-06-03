@@ -14,6 +14,8 @@ import {
   Menu,
   LogOut,
   LogIn,
+  FlaskConical,
+  HeartPulse,
 } from "lucide-react";
 import {
   Sheet,
@@ -38,11 +40,15 @@ const navLinks = [
   { href: "/report", label: "Report", icon: BarChart3 },
 ] as const;
 
+const devBypass =
+  process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === "true";
+
 export default function Navbar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const showAppNav = Boolean(user) || devBypass;
 
   useEffect(() => {
     const supabase = createClient();
@@ -78,7 +84,7 @@ export default function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {user &&
+          {showAppNav &&
             navLinks.map(({ href, label, icon: Icon }) => {
               const active =
                 pathname === href || pathname.startsWith(href + "/");
@@ -98,6 +104,32 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+          <Link
+            href="/science"
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              pathname === "/science" || pathname.startsWith("/science/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            <FlaskConical className="size-4" />
+            Science
+          </Link>
+
+          <Link
+            href="/rehab"
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              pathname === "/rehab" || pathname.startsWith("/rehab/")
+                ? "bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            )}
+          >
+            <HeartPulse className="size-4" />
+            Recover
+          </Link>
 
           <div className="ml-2 min-w-[7rem]">
             {user ? (
@@ -141,7 +173,7 @@ export default function Navbar() {
             </SheetHeader>
 
             <nav className="flex flex-1 flex-col gap-1 px-2">
-              {user &&
+              {showAppNav &&
                 navLinks.map(({ href, label, icon: Icon }) => {
                   const active =
                     pathname === href || pathname.startsWith(href + "/");
@@ -162,6 +194,36 @@ export default function Navbar() {
                     </SheetClose>
                   );
                 })}
+
+              <SheetClose asChild>
+                <Link
+                  href="/science"
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    pathname === "/science" || pathname.startsWith("/science/")
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
+                >
+                  <FlaskConical className="size-5" />
+                  Science
+                </Link>
+              </SheetClose>
+
+              <SheetClose asChild>
+                <Link
+                  href="/rehab"
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                    pathname === "/rehab" || pathname.startsWith("/rehab/")
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                  )}
+                >
+                  <HeartPulse className="size-5" />
+                  Recover
+                </Link>
+              </SheetClose>
 
               <div className="mt-auto border-t pt-3">
                 {user ? (
