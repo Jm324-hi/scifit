@@ -1,4 +1,6 @@
-# Kineroz — 部署清单
+# Kineroz — Netlify 部署清单
+
+项目已配置 `@netlify/plugin-nextjs`，连接到 GitHub 后推送 `main` 即自动部署。
 
 ## 1. 推送代码
 
@@ -6,22 +8,23 @@
 git push origin main
 ```
 
-## 2. Vercel（推荐）
+如果 Netlify 已连仓库，Deploys 页面会自动出现一次新构建。
 
-1. 打开 [vercel.com/new](https://vercel.com/new)，导入 GitHub 仓库 `Jm324-hi/scifit`
-2. Framework Preset：**Next.js**（默认即可）
-3. **Environment Variables**（Production + Preview 都填）：
+## 2. 首次部署（仅初次）
+
+1. [app.netlify.com](https://app.netlify.com) → **Add new site → Import an existing project**
+2. 选 GitHub → 仓库 `Jm324-hi/scifit`
+3. **Build settings** 保持默认（`netlify.toml` 已写好 `npm run build`、`.next`、`@netlify/plugin-nextjs`）
+4. **Environment variables**（Site configuration → Environment variables）：
 
 | 变量 | 说明 |
 |------|------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API → Project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → anon public key |
-| `NEXT_PUBLIC_SITE_URL` | 部署后的正式域名，如 `https://kineroz.vercel.app` 或自定义域 |
+| `NEXT_PUBLIC_SITE_URL` | 部署后的 Netlify 域名或自定义域，如 `https://kineroz.com` |
 | `OPENAI_API_KEY` | 若使用 AI 计划功能则必填 |
 
-**不要在 Vercel 上设置** `DEV_BYPASS_AUTH` / `NEXT_PUBLIC_DEV_BYPASS_AUTH` / `DEV_EMAIL` / `DEV_PASSWORD`（仅本地 `.env.local`）。
-
-4. Deploy → 等待构建完成
+不要设置 `DEV_BYPASS_AUTH` / `NEXT_PUBLIC_DEV_BYPASS_AUTH` / `DEV_EMAIL` / `DEV_PASSWORD`（仅本地 `.env.local`）。
 
 ## 3. Supabase Auth 回调
 
@@ -48,4 +51,4 @@ DEV_BYPASS_AUTH=true
 NEXT_PUBLIC_DEV_BYPASS_AUTH=true
 ```
 
-线上访客仍需正常注册/登录。
+线上访客仍需正常注册/登录（线上不会读这两个变量）。
